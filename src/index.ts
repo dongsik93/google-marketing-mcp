@@ -56,9 +56,21 @@ function resolvePropertyId(propertyId?: string): string {
   return id;
 }
 
+const instructions = [
+  DEFAULT_GA4_PROPERTY_ID
+    ? `GA4_PROPERTY_ID=${DEFAULT_GA4_PROPERTY_ID} 환경변수가 설정되어 있습니다. 사용자가 "연결 확인", "잘 되냐", "테스트" 등 단순 확인을 요청하더라도 list_accounts나 list_properties를 호출하지 마세요. 환경변수에 이미 기본 Property가 지정되어 있으므로 바로 데이터 조회 tool을 사용하세요.`
+    : null,
+  DEFAULT_ADS_CUSTOMER_ID
+    ? `GOOGLE_ADS_CUSTOMER_ID=${DEFAULT_ADS_CUSTOMER_ID} 환경변수가 설정되어 있습니다. 사용자가 명시적으로 계정 목록을 요청하지 않는 한 ads_list_campaigns 등 데이터 tool을 바로 호출하세요.`
+    : null,
+]
+  .filter(Boolean)
+  .join("\n");
+
 const server = new McpServer({
   name: "google-marketing-mcp",
-  version: "0.1.0",
+  version: "0.1.3",
+  ...(instructions ? { instructions } : {}),
 });
 
 const propertyIdSchema = DEFAULT_GA4_PROPERTY_ID
@@ -85,15 +97,24 @@ const dimensionFilterSchema = z
 
 // ── GA4 Tools ──────────────────────────────────────────────────────────────
 
-server.tool("list_accounts", "GA4 계정 목록 조회", {}, async () => {
-  const client = await getGA4();
-  const result = await client.listAccounts();
-  return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
-});
+server.tool(
+  "list_accounts",
+  DEFAULT_GA4_PROPERTY_ID
+    ? "GA4 계정 목록 조회. 주의: GA4_PROPERTY_ID 환경변수가 이미 설정되어 있으므로 사용자가 명시적으로 계정 목록을 요청하지 않는 한 이 tool을 호출하지 말 것."
+    : "GA4 계정 목록 조회",
+  {},
+  async () => {
+    const client = await getGA4();
+    const result = await client.listAccounts();
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
 
 server.tool(
   "list_properties",
-  "GA4 속성(Property) 목록 조회",
+  DEFAULT_GA4_PROPERTY_ID
+    ? "GA4 속성(Property) 목록 조회. 주의: GA4_PROPERTY_ID 환경변수가 이미 설정되어 있으므로 사용자가 명시적으로 property 목록을 요청하지 않는 한 이 tool을 호출하지 말 것."
+    : "GA4 속성(Property) 목록 조회",
   { accountId: z.string().describe("GA4 계정 ID (숫자)") },
   async ({ accountId }) => {
     const client = await getGA4();
