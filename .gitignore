@@ -1,0 +1,12 @@
+client_secret.json
+credentials.json
+token.json
+.env
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+node_modules/
+.DS_Store
+~/.google-marketing-mcp/

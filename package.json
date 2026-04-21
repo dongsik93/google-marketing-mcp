@@ -1,0 +1,31 @@
+{
+  "name": "@dongsik/google-marketing-mcp",
+  "version": "0.1.0",
+  "description": "Google Marketing MCP Server — GA4 + Google Ads",
+  "license": "MIT",
+  "type": "module",
+  "files": [
+    "dist",
+    "docs",
+    "README.md"
+  ],
+  "bin": {
+    "google-marketing-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "googleapis": "^144.0.0",
+    "google-ads-api": "^17.0.0",
+    "open": "^10.0.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.5.0"
+  }
+}
