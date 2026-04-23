@@ -148,6 +148,7 @@ npx -y @dongsik/google-marketing-mcp
         "GA_CLIENT_SECRET_PATH": "/path/to/client_secret.json",
         "GA4_PROPERTY_ID": "123456789",
         "GOOGLE_ADS_CUSTOMER_ID": "1234567890",
+        "GOOGLE_ADS_LOGIN_CUSTOMER_ID": "9876543210",
         "GOOGLE_ADS_DEVELOPER_TOKEN": "발급받은_토큰"
       }
     }
@@ -163,7 +164,8 @@ npx -y @dongsik/google-marketing-mcp
 |---|---|---|
 | `GA_CLIENT_SECRET_PATH` | 필수 | `client_secret.json` 파일의 절대 경로 |
 | `GA4_PROPERTY_ID` | 선택 | 기본 GA4 Property ID. 설정하면 매 요청마다 입력할 필요 없음 |
-| `GOOGLE_ADS_CUSTOMER_ID` | 선택 | 기본 Google Ads Customer ID (숫자만). 설정하면 매 요청마다 입력할 필요 없음 |
+| `GOOGLE_ADS_CUSTOMER_ID` | 선택 | Google Ads 광고 계정 Customer ID (숫자만, 예: `4279865238`) |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | 선택 | MCC(관리자 계정) Customer ID. MCC를 통해 하위 계정에 접근할 때 필요 |
 | `GOOGLE_ADS_DEVELOPER_TOKEN` | 필수 | Google Ads API Developer Token |
 
 ### 최초 실행 및 인증

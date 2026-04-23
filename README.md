@@ -148,6 +148,7 @@ Add to your `claude_desktop_config.json`:
         "GA_CLIENT_SECRET_PATH": "/path/to/client_secret.json",
         "GA4_PROPERTY_ID": "123456789",
         "GOOGLE_ADS_CUSTOMER_ID": "1234567890",
+        "GOOGLE_ADS_LOGIN_CUSTOMER_ID": "9876543210",
         "GOOGLE_ADS_DEVELOPER_TOKEN": "your_developer_token"
       }
     }
@@ -163,7 +164,8 @@ Add to your `claude_desktop_config.json`:
 |---|---|---|
 | `GA_CLIENT_SECRET_PATH` | Yes | Absolute path to your OAuth `client_secret.json` |
 | `GA4_PROPERTY_ID` | No | Default GA4 Property ID. If set, you don't need to pass it per request |
-| `GOOGLE_ADS_CUSTOMER_ID` | No | Default Google Ads Customer ID (digits only). If set, you don't need to pass it per request |
+| `GOOGLE_ADS_CUSTOMER_ID` | No | Google Ads client account Customer ID (digits only, e.g. `4279865238`) |
+| `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | No | MCC (manager account) Customer ID. Required when accessing a client account through a manager account |
 | `GOOGLE_ADS_DEVELOPER_TOKEN` | Yes | Google Ads API Developer Token |
 
 ### First Run
