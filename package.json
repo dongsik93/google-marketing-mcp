@@ -1,6 +1,6 @@
 {
   "name": "@dongsik/google-marketing-mcp",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Google Marketing MCP Server — GA4 + Google Ads",
   "license": "MIT",
   "type": "module",

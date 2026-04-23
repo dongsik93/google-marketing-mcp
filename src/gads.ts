@@ -23,6 +23,7 @@ export class GoogleAdsClient {
   private clientSecretPath: string;
   private developerToken: string;
   private customerId: string;
+  private loginCustomerId: string;
   private refreshToken: string;
   private api: GoogleAdsApi;
 
@@ -31,11 +32,13 @@ export class GoogleAdsClient {
     clientSecretPath: string,
     developerToken: string,
     customerId: string,
-    refreshToken: string
+    refreshToken: string,
+    loginCustomerId: string = ""
   ) {
     this.clientSecretPath = clientSecretPath;
     this.developerToken = developerToken;
     this.customerId = customerId.replace(/-/g, "");
+    this.loginCustomerId = loginCustomerId.replace(/-/g, "");
     this.refreshToken = refreshToken;
 
     const creds = loadClientCredentials(clientSecretPath);
@@ -47,10 +50,15 @@ export class GoogleAdsClient {
   }
 
   private getCustomer(customerId?: string): Customer {
-    return this.api.Customer({
-      customer_id: (customerId || this.customerId).replace(/-/g, ""),
+    const cid = (customerId || this.customerId).replace(/-/g, "");
+    const opts: any = {
+      customer_id: cid,
       refresh_token: this.refreshToken,
-    });
+    };
+    if (this.loginCustomerId) {
+      opts.login_customer_id = this.loginCustomerId;
+    }
+    return this.api.Customer(opts);
   }
 
   async listCampaigns(customerId?: string, includePaused = true) {

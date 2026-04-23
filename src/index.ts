@@ -13,6 +13,7 @@ const CLIENT_SECRET_PATH =
 
 const DEFAULT_GA4_PROPERTY_ID = process.env.GA4_PROPERTY_ID || "";
 const DEFAULT_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID || "";
+const DEFAULT_ADS_LOGIN_CUSTOMER_ID = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "";
 const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
 
 let ga4: GA4Client | null = null;
@@ -40,7 +41,8 @@ async function getGAds(): Promise<GoogleAdsClient> {
       CLIENT_SECRET_PATH,
       DEVELOPER_TOKEN,
       DEFAULT_ADS_CUSTOMER_ID,
-      refreshToken
+      refreshToken,
+      DEFAULT_ADS_LOGIN_CUSTOMER_ID
     );
   }
   return gads;
@@ -69,7 +71,7 @@ const instructions = [
 
 const server = new McpServer({
   name: "google-marketing-mcp",
-  version: "0.1.3",
+  version: "0.1.4",
   ...(instructions ? { instructions } : {}),
 });
 
