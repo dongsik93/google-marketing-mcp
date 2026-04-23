@@ -71,7 +71,7 @@ const instructions = [
 
 const server = new McpServer({
   name: "google-marketing-mcp",
-  version: "0.1.4",
+  version: "0.1.5",
   ...(instructions ? { instructions } : {}),
 });
 
