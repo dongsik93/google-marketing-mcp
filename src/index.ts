@@ -6,18 +6,26 @@ import { z } from "zod";
 import { getAuthenticatedClient, getRefreshToken } from "./auth.js";
 import { GA4Client } from "./ga4.js";
 import { GoogleAdsClient } from "./gads.js";
+import { GSCClient } from "./gsc.js";
 
 const CLIENT_SECRET_PATH =
   process.env.GA_CLIENT_SECRET_PATH ||
   new URL("../client_secret.json", import.meta.url).pathname;
 
 const DEFAULT_GA4_PROPERTY_ID = process.env.GA4_PROPERTY_ID || "";
+const DEFAULT_GSC_SITE_URL = process.env.GSC_SITE_URL || "";
 const DEFAULT_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID || "";
 const DEFAULT_ADS_LOGIN_CUSTOMER_ID = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "";
 const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
 
+// 모듈 활성화 플래그 — 환경변수 없으면 해당 도구는 등록 안 함
+const ENABLE_GA4 = !!DEFAULT_GA4_PROPERTY_ID || (!DEFAULT_GSC_SITE_URL && !DEVELOPER_TOKEN);
+const ENABLE_GSC = !!DEFAULT_GSC_SITE_URL;
+const ENABLE_ADS = !!DEVELOPER_TOKEN;
+
 let ga4: GA4Client | null = null;
 let gads: GoogleAdsClient | null = null;
+let gsc: GSCClient | null = null;
 
 async function getGA4(): Promise<GA4Client> {
   if (!ga4) {
@@ -25,6 +33,25 @@ async function getGA4(): Promise<GA4Client> {
     ga4 = new GA4Client(auth);
   }
   return ga4;
+}
+
+async function getGSC(): Promise<GSCClient> {
+  if (!gsc) {
+    const auth = await getAuthenticatedClient(CLIENT_SECRET_PATH);
+    gsc = new GSCClient(auth);
+  }
+  return gsc;
+}
+
+function resolveSiteUrl(siteUrl?: string): string {
+  const url = siteUrl || DEFAULT_GSC_SITE_URL;
+  if (!url) {
+    throw new Error(
+      "siteUrl이 필요합니다. 파라미터로 전달하거나 GSC_SITE_URL 환경변수를 설정하세요. " +
+      "(URL prefix property: https://example.com/ · Domain property: sc-domain:example.com)"
+    );
+  }
+  return url;
 }
 
 async function getGAds(): Promise<GoogleAdsClient> {
@@ -62,6 +89,9 @@ const instructions = [
   DEFAULT_GA4_PROPERTY_ID
     ? `GA4_PROPERTY_ID=${DEFAULT_GA4_PROPERTY_ID} 환경변수가 설정되어 있습니다. 사용자가 "연결 확인", "잘 되냐", "테스트" 등 단순 확인을 요청하더라도 list_accounts나 list_properties를 호출하지 마세요. 환경변수에 이미 기본 Property가 지정되어 있으므로 바로 데이터 조회 tool을 사용하세요.`
     : null,
+  DEFAULT_GSC_SITE_URL
+    ? `GSC_SITE_URL=${DEFAULT_GSC_SITE_URL} 환경변수가 설정되어 있습니다. 사용자가 명시적으로 사이트 목록을 요청하지 않는 한 gsc_list_sites를 호출하지 말고 바로 gsc_top_queries / gsc_top_pages 같은 데이터 tool을 사용하세요.`
+    : null,
   DEFAULT_ADS_CUSTOMER_ID
     ? `GOOGLE_ADS_CUSTOMER_ID=${DEFAULT_ADS_CUSTOMER_ID} 환경변수가 설정되어 있습니다. 사용자가 명시적으로 계정 목록을 요청하지 않는 한 ads_list_campaigns 등 데이터 tool을 바로 호출하세요.`
     : null,
@@ -71,7 +101,7 @@ const instructions = [
 
 const server = new McpServer({
   name: "google-marketing-mcp",
-  version: "0.1.5",
+  version: "0.2.0",
   ...(instructions ? { instructions } : {}),
 });
 
@@ -97,7 +127,9 @@ const dimensionFilterSchema = z
   .optional()
   .describe("디멘션 필터 목록");
 
-// ── GA4 Tools ──────────────────────────────────────────────────────────────
+// ── GA4 Tools (GA4_PROPERTY_ID 있을 때만 등록 / 호환을 위해 다른 모듈 모두 비활성 시에도 등록) ──
+
+if (ENABLE_GA4) {
 
 server.tool(
   "list_accounts",
@@ -435,6 +467,175 @@ server.tool(
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   }
 );
+
+} // ENABLE_GA4
+
+// ── Google Search Console Tools (GSC_SITE_URL 있을 때만 등록) ───────────────
+
+const siteUrlSchema = DEFAULT_GSC_SITE_URL
+  ? z.string().optional().describe("Search Console 사이트 URL (미입력 시 환경변수 GSC_SITE_URL 사용)")
+  : z.string().describe("Search Console 사이트 URL (URL prefix: https://example.com/ · Domain: sc-domain:example.com)");
+
+const gscFilterSchema = z
+  .array(
+    z.object({
+      dimension: z.string().describe("필터 대상 디멘션 (query | page | country | device | searchAppearance)"),
+      operator: z
+        .enum(["equals", "notEquals", "contains", "notContains"])
+        .optional()
+        .describe("매칭 방식 (기본 equals)"),
+      expression: z.string().describe("필터 값"),
+    })
+  )
+  .optional()
+  .describe("디멘션 필터 (AND 결합)");
+
+if (ENABLE_GSC) {
+
+server.tool(
+  "gsc_list_sites",
+  DEFAULT_GSC_SITE_URL
+    ? "Search Console 사이트 목록 조회. 주의: GSC_SITE_URL 환경변수가 이미 설정되어 있으므로 사용자가 명시적으로 사이트 목록을 요청하지 않는 한 이 tool을 호출하지 말 것."
+    : "Search Console 등록된 사이트 목록 조회",
+  {},
+  async () => {
+    const client = await getGSC();
+    const result = await client.listSites();
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+server.tool(
+  "gsc_query",
+  "Search Analytics 쿼리 — GSC 모든 검색 데이터의 핵심. dimensions 조합으로 query/page/country/device/date 별 노출·클릭·CTR·평균순위 조회.",
+  {
+    siteUrl: siteUrlSchema,
+    startDate: z.string().describe("시작일 (YYYY-MM-DD)"),
+    endDate: z.string().describe("종료일 (YYYY-MM-DD)"),
+    dimensions: z.array(z.string()).optional().describe(
+      "디멘션 (query · page · country · device · searchAppearance · date)"
+    ),
+    filters: gscFilterSchema,
+    type: z
+      .enum(["web", "image", "video", "news", "discover", "googleNews"])
+      .optional()
+      .describe("검색 유형 (기본 web)"),
+    rowLimit: z.number().optional().describe("최대 행 수 (기본 100, 최대 25000)"),
+    startRow: z.number().optional().describe("페이지네이션 시작 행 (기본 0)"),
+    aggregationType: z
+      .enum(["auto", "byPage", "byProperty"])
+      .optional()
+      .describe("집계 방식"),
+  },
+  async (params) => {
+    const client = await getGSC();
+    const result = await client.queryAnalytics({
+      ...params,
+      siteUrl: resolveSiteUrl(params.siteUrl),
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+server.tool(
+  "gsc_top_queries",
+  "검색어 TOP N — 어떤 검색어로 사이트가 노출·클릭됐는지. 노출수 높은 순.",
+  {
+    siteUrl: siteUrlSchema,
+    startDate: z.string().describe("시작일"),
+    endDate: z.string().describe("종료일"),
+    rowLimit: z.number().optional().describe("최대 행 수 (기본 50)"),
+  },
+  async ({ siteUrl, startDate, endDate, rowLimit }) => {
+    const client = await getGSC();
+    const result = await client.queryAnalytics({
+      siteUrl: resolveSiteUrl(siteUrl),
+      startDate,
+      endDate,
+      dimensions: ["query"],
+      rowLimit: rowLimit ?? 50,
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+server.tool(
+  "gsc_top_pages",
+  "페이지별 검색 성과 — 어떤 글이 검색에서 노출·클릭됐는지. 노출수 높은 순.",
+  {
+    siteUrl: siteUrlSchema,
+    startDate: z.string().describe("시작일"),
+    endDate: z.string().describe("종료일"),
+    rowLimit: z.number().optional().describe("최대 행 수 (기본 50)"),
+  },
+  async ({ siteUrl, startDate, endDate, rowLimit }) => {
+    const client = await getGSC();
+    const result = await client.queryAnalytics({
+      siteUrl: resolveSiteUrl(siteUrl),
+      startDate,
+      endDate,
+      dimensions: ["page"],
+      rowLimit: rowLimit ?? 50,
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+server.tool(
+  "gsc_queries_by_page",
+  "특정 페이지로 들어온 검색어 — 한 글이 어떤 키워드로 노출됐는지 분석.",
+  {
+    siteUrl: siteUrlSchema,
+    pageUrl: z.string().describe("분석할 페이지 URL (정확히 일치)"),
+    startDate: z.string().describe("시작일"),
+    endDate: z.string().describe("종료일"),
+    rowLimit: z.number().optional().describe("최대 행 수 (기본 50)"),
+  },
+  async ({ siteUrl, pageUrl, startDate, endDate, rowLimit }) => {
+    const client = await getGSC();
+    const result = await client.queryAnalytics({
+      siteUrl: resolveSiteUrl(siteUrl),
+      startDate,
+      endDate,
+      dimensions: ["query"],
+      filters: [{ dimension: "page", operator: "equals", expression: pageUrl }],
+      rowLimit: rowLimit ?? 50,
+    });
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+server.tool(
+  "gsc_inspect_url",
+  "URL 색인 상태 검사 — 특정 페이지가 색인됐는지, 모바일 적합성, 마지막 크롤링 일자 등.",
+  {
+    siteUrl: siteUrlSchema,
+    inspectedUrl: z.string().describe("검사할 URL (siteUrl 도메인 내)"),
+    languageCode: z.string().optional().describe("언어 코드 (기본 ko)"),
+  },
+  async ({ siteUrl, inspectedUrl, languageCode }) => {
+    const client = await getGSC();
+    const result = await client.inspectUrl(
+      resolveSiteUrl(siteUrl),
+      inspectedUrl,
+      languageCode
+    );
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+server.tool(
+  "gsc_list_sitemaps",
+  "사이트맵 목록 — 제출 일자, 색인 상태, 오류·경고 수 포함.",
+  { siteUrl: siteUrlSchema },
+  async ({ siteUrl }) => {
+    const client = await getGSC();
+    const result = await client.listSitemaps(resolveSiteUrl(siteUrl));
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+} // ENABLE_GSC
 
 // ── Google Ads Tools (GOOGLE_ADS_DEVELOPER_TOKEN 있을 때만 등록) ────────────
 

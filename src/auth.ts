@@ -6,6 +6,7 @@ import open from "open";
 
 const GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 const ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
+const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 
 const TOKEN_DIR = path.join(
   process.env.HOME || process.env.USERPROFILE || ".",
@@ -53,10 +54,20 @@ function tokenHasScope(token: any, scope: string): boolean {
 }
 
 function buildScopes(): string[] {
-  const scopes = [GA4_SCOPE];
-  // Developer Token이 설정된 경우에만 Ads scope 요청
-  if (process.env.GOOGLE_ADS_DEVELOPER_TOKEN) {
-    scopes.push(ADS_SCOPE);
+  const scopes: string[] = [];
+  // 각 모듈은 해당 환경변수가 있을 때만 스코프 요청 (불필요한 권한 요구 회피).
+  // 셋 중 하나도 활성화 안 됐으면 GA4 디폴트로 켜둔다 (가장 흔한 사용 케이스).
+  const enableGA4 = !!process.env.GA4_PROPERTY_ID;
+  const enableGSC = !!process.env.GSC_SITE_URL;
+  const enableAds = !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+
+  if (enableGA4) scopes.push(GA4_SCOPE);
+  if (enableGSC) scopes.push(GSC_SCOPE);
+  if (enableAds) scopes.push(ADS_SCOPE);
+
+  if (scopes.length === 0) {
+    // 아무것도 활성화 안 됨 — GA4 디폴트로 (기존 사용자 호환)
+    scopes.push(GA4_SCOPE);
   }
   return scopes;
 }
@@ -129,12 +140,10 @@ export async function getAuthenticatedClient(
 
   const savedToken = loadSavedToken();
   if (savedToken) {
-    // Ads scope가 필요한데 기존 토큰에 없으면 재인증
-    const needsAds = scopes.includes(ADS_SCOPE);
-    const hasAds = tokenHasScope(savedToken, ADS_SCOPE);
-
-    if (needsAds && !hasAds) {
-      // Ads가 새로 추가된 경우 재인증
+    // 활성화한 모듈의 스코프가 기존 토큰에 빠져있으면 재인증.
+    // 다른 모듈만 쓰던 사용자가 새 모듈 켰을 때만 OAuth 다시 돌게 한다.
+    const missingScope = scopes.find((s) => !tokenHasScope(savedToken, s));
+    if (missingScope) {
       await authorizeViaLocalServer(oauth2Client, scopes);
       return oauth2Client;
     }

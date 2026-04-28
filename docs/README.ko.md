@@ -2,9 +2,11 @@
 
 [![npm](https://img.shields.io/npm/v/@dongsik/google-marketing-mcp)](https://www.npmjs.com/package/@dongsik/google-marketing-mcp)
 
-[English](../README.md)
+[English](https://github.com/dongsik93/ga_ads_mcp/blob/main/README.md)
 
-Claude Desktop에서 Google Analytics 4와 Google Ads 데이터를 자연어로 조회할 수 있는 MCP 서버입니다.
+Claude Desktop에서 **Google Analytics 4**, **Google Search Console**, **Google Ads** 데이터를 자연어로 조회할 수 있는 MCP 서버입니다.
+
+각 모듈은 환경변수로 독립적으로 활성화됩니다 — 하나, 둘, 셋 중 원하는 만큼만 사용하세요.
 
 ```bash
 npx -y @dongsik/google-marketing-mcp
@@ -58,6 +60,18 @@ npx -y @dongsik/google-marketing-mcp
 | `search_metadata` | 메트릭/디멘션 키워드 검색 |
 | `list_categories` | 메트릭/디멘션 카테고리 목록 조회 |
 
+### Google Search Console
+
+| 도구 | 설명 |
+|---|---|
+| `gsc_list_sites` | Search Console 등록된 사이트 목록 조회 |
+| `gsc_query` | Search Analytics 쿼리 — query/page/country/device/searchAppearance/date 자유 조합 |
+| `gsc_top_queries` | 노출수 기준 검색어 TOP — 어떤 검색어로 사이트가 노출되는지 |
+| `gsc_top_pages` | 노출수 기준 페이지 TOP — 어떤 글이 검색에 가장 많이 노출되는지 |
+| `gsc_queries_by_page` | 특정 페이지로 들어온 검색어 — 한 글의 키워드 분석 |
+| `gsc_inspect_url` | URL 색인 상태 검사 — 색인 여부, 모바일 적합성, 마지막 크롤링 |
+| `gsc_list_sitemaps` | 사이트맵 목록 — 제출 일자, 색인 상태, 오류·경고 |
+
 ### Google Ads
 
 **캠페인 & 광고 구조**
@@ -97,10 +111,11 @@ npx -y @dongsik/google-marketing-mcp
 ### 1. Google Cloud Console 설정
 
 1. [Google Cloud Console](https://console.cloud.google.com/)에서 프로젝트를 생성하거나 선택합니다
-2. **API 및 서비스 → 라이브러리** → 다음 API를 활성화합니다:
-   - **Google Analytics Data API**
-   - **Google Analytics Admin API**
-   - **Google Ads API**
+2. **API 및 서비스 → 라이브러리** → 사용할 모듈에 해당하는 API를 활성화합니다:
+   - **Google Analytics Data API** + **Google Analytics Admin API** (GA4 사용 시)
+   - **Search Console API** (Search Console 사용 시)
+   - **Google Ads API** (Google Ads 사용 시)
+   실제 사용할 모듈의 API만 활성화하면 됩니다.
 3. **API 및 서비스 → OAuth 동의 화면**
    - 사용자 유형을 **외부(External)**로 설정
    - 테스트 사용자에 본인 Google 계정 추가
@@ -123,6 +138,10 @@ npx -y @dongsik/google-marketing-mcp
 1. [Google Analytics](https://analytics.google.com) 접속
 2. 좌측 하단 **관리(톱니바퀴 아이콘)** → **속성 설정**
 3. 상단에 표시된 숫자 ID가 Property ID입니다 (예: `417304962`)
+
+**Search Console Site URL**
+- URL prefix 속성: `https://example.com/` (끝 슬래시 포함)
+- Domain 속성: `sc-domain:example.com`
 
 **Google Ads Customer ID 확인**
 1. [Google Ads](https://ads.google.com/) 접속
@@ -147,6 +166,7 @@ npx -y @dongsik/google-marketing-mcp
       "env": {
         "GA_CLIENT_SECRET_PATH": "/path/to/client_secret.json",
         "GA4_PROPERTY_ID": "123456789",
+        "GSC_SITE_URL": "https://example.com/",
         "GOOGLE_ADS_CUSTOMER_ID": "1234567890",
         "GOOGLE_ADS_LOGIN_CUSTOMER_ID": "9876543210",
         "GOOGLE_ADS_DEVELOPER_TOKEN": "발급받은_토큰"
@@ -160,13 +180,16 @@ npx -y @dongsik/google-marketing-mcp
 
 ### 환경변수
 
-| 변수 | 필수 여부 | 설명 |
+| 변수 | 효과 | 설명 |
 |---|---|---|
 | `GA_CLIENT_SECRET_PATH` | 필수 | `client_secret.json` 파일의 절대 경로 |
-| `GA4_PROPERTY_ID` | 선택 | 기본 GA4 Property ID. 설정하면 매 요청마다 입력할 필요 없음 |
+| `GA4_PROPERTY_ID` | GA4 모듈 활성화 | 기본 GA4 Property ID. 설정하면 GA4 도구 활성화 |
+| `GSC_SITE_URL` | GSC 모듈 활성화 | Search Console 사이트 URL (`https://example.com/` 또는 `sc-domain:example.com`). 설정하면 Search Console 도구 활성화 |
+| `GOOGLE_ADS_DEVELOPER_TOKEN` | Ads 모듈 활성화 | Google Ads API Developer Token. 설정하면 Google Ads 도구 활성화 |
 | `GOOGLE_ADS_CUSTOMER_ID` | 선택 | Google Ads 광고 계정 Customer ID (숫자만, 예: `4279865238`) |
 | `GOOGLE_ADS_LOGIN_CUSTOMER_ID` | 선택 | MCC(관리자 계정) Customer ID. MCC를 통해 하위 계정에 접근할 때 필요 |
-| `GOOGLE_ADS_DEVELOPER_TOKEN` | 필수 | Google Ads API Developer Token |
+
+**각 모듈은 독립적입니다.** 사용할 모듈의 환경변수만 설정하세요 — OAuth 권한 요청도 해당 모듈에 필요한 스코프만 요구합니다.
 
 ### 최초 실행 및 인증
 
@@ -182,6 +205,13 @@ Claude Desktop에서 자연어로 질문하세요:
 - "지금 실시간으로 접속 중인 사용자 현황 알려줘"
 - "접근 가능한 GA4 Property 목록 조회해줘"
 - "지난 30일간 페이지뷰 기준 상위 10개 페이지 보여줘"
+
+**Search Console**
+- "지난 28일간 노출수 기준 검색어 TOP 20"
+- "검색에서 노출이 가장 많은 페이지는?"
+- "/my-best-article/ 페이지로 들어온 검색어 알려줘"
+- "https://example.com/recent-post/ 색인 상태 확인해줘"
+- "제출한 사이트맵 목록과 상태 보여줘"
 
 **Google Ads**
 - "현재 활성화된 캠페인 목록 보여줘"
