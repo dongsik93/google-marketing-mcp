@@ -12,6 +12,8 @@ Claude Desktop에서 **Google Analytics 4**, **Google Search Console**, **Google
 npx -y @dongsik/google-marketing-mcp
 ```
 
+> **v0.4.0 안내** — YouTube는 이제 GA4/GSC와 분리된 **별도 OAuth 토큰** (`token.youtube.json`) 을 사용합니다. 채널이 Brand Account 소유여도 개인 Gmail로 운영하는 GA4/GSC와 충돌하지 않게 합니다. GA4/GSC/Ads만 쓰던 사용자는 영향 없음. v0.3.0 에서 YouTube까지 쓰던 사용자는 YouTube 첫 호출 시 한 번만 재인증. 자세한 건 [CHANGELOG](../CHANGELOG.md) 참조.
+
 ## 모듈
 
 | 모듈 | 활성 환경변수 | 도구 수 | 문서 |

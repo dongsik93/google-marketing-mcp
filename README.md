@@ -12,6 +12,8 @@ Each module is independently activated by environment variables — pick any sub
 npx -y @dongsik/google-marketing-mcp
 ```
 
+> **v0.4.0 note** — YouTube now uses a **separate OAuth token** (`token.youtube.json`) so it can authorize against a Brand Account without conflicting with the personal Google account used by GA4/GSC. GA4/GSC/Ads users are unaffected. v0.3.0 YouTube users re-authorize once on the next YouTube call. See [CHANGELOG](./CHANGELOG.md).
+
 ## Modules
 
 | Module | Activates with | Tools | Docs |
