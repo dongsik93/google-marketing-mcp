@@ -14,15 +14,22 @@ npx -y @dongsik/google-marketing-mcp
 
 > **v0.4.0 안내** — YouTube는 이제 GA4/GSC와 분리된 **별도 OAuth 토큰** (`token.youtube.json`) 을 사용합니다. 채널이 Brand Account 소유여도 개인 Gmail로 운영하는 GA4/GSC와 충돌하지 않게 합니다. GA4/GSC/Ads만 쓰던 사용자는 영향 없음. v0.3.0 에서 YouTube까지 쓰던 사용자는 YouTube 첫 호출 시 한 번만 재인증. 자세한 건 [CHANGELOG](../CHANGELOG.md) 참조.
 
+> **v0.4.2 안내** — 기존 설정을 깨지 않는 보조 도구 `status`, `yt_resolve_channel`, `check_youtube_ga4_traffic` 가 추가됐습니다.
+
 ## 모듈
 
 | 모듈 | 활성 환경변수 | 도구 수 | 문서 |
 |---|---|---|---|
-| **Google Analytics 4** | `GA4_PROPERTY_ID` | 20 | [문서](./modules/ga4.ko.md) |
+| **공통** | 항상 | 1 | 이 문서 |
+| **Google Analytics 4** | `GA4_PROPERTY_ID` | 21 | [문서](./modules/ga4.ko.md) |
 | **Google Search Console** | `GSC_SITE_URL` | 7 | [문서](./modules/gsc.ko.md) |
 | **Google Ads** | `GOOGLE_ADS_DEVELOPER_TOKEN` | 12 | [문서](./modules/ads.ko.md) |
-| **YouTube** (Data + Analytics) | `YT_CHANNEL_ID` | 16 | [문서](./modules/youtube.ko.md) |
+| **YouTube** (Data + Analytics) | `YT_CHANNEL_ID` | 17 | [문서](./modules/youtube.ko.md) |
 | **GA4 × Ads 통합** | 위 둘 다 | 7 | [문서](./modules/combined.ko.md) |
+
+공통 보조 도구:
+
+- `status`: 어떤 모듈이 활성화됐고 어떤 환경변수가 설정됐는지 확인합니다. 비밀값은 출력하지 않습니다.
 
 ## 공통 설정
 

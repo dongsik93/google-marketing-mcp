@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.2 — 2026-04-30
+
+### Added
+
+- `status` common tool: reports enabled modules and configured env values without exposing secrets.
+- `yt_resolve_channel`: resolves a YouTube `@handle`, channel URL, or `UC...` channel ID to channel metadata. Useful before setting `YT_CHANNEL_ID`.
+- `check_youtube_ga4_traffic`: GA4 helper that filters sessions related to YouTube/Shorts traffic (`youtube`, `youtu.be`, `shorts`) across source, medium, campaign, and landing page.
+
+### Compatibility
+
+- No existing tool names, environment variables, token paths, or module activation rules were removed.
+- `check_youtube_ga4_traffic` is registered only when GA4 is active, preserving the previous behavior for YouTube-only/GSC-only/Ads-only users.
+
 ## 0.4.1 — 2026-04-30
 
 - Docs only: add CHANGELOG and migration notes to root READMEs (en/ko) so v0.3.0 → v0.4.0 upgraders see the YouTube re-auth note.

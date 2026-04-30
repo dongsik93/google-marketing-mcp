@@ -13,6 +13,7 @@ Activated by setting `YT_CHANNEL_ID`.
 | `yt_list_videos` | Channel video list (latest N) — title, publishedAt, duration, views, likes, comments, privacy status |
 | `yt_video_stats` | Detailed info for one or more videos (title, description, tags, duration, statistics, category) |
 | `yt_search_videos` | Search videos within a channel by keyword |
+| `yt_resolve_channel` | Resolve a YouTube `@handle`, channel URL, or `UC...` channel ID to channel metadata before setting `YT_CHANNEL_ID` |
 
 **Performance & Audience (Analytics API v2)**
 | Tool | Description |
@@ -41,6 +42,7 @@ Activated by setting `YT_CHANNEL_ID`.
 
 - Go to [YouTube Studio](https://studio.youtube.com/) → Settings → Channel → Advanced settings → **Channel ID**
 - Or open your channel page and check the URL: `youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx`
+- Or use `yt_resolve_channel` with a handle such as `@yourhandle`
 - Format: `UC` + 22 characters
 
 ### 3. Environment variables
@@ -71,6 +73,7 @@ If your channel is owned by a Google Brand Account and you see **"This service i
 ## Usage Examples
 
 - "List my latest 20 videos with view counts"
+- "Resolve @mychannel to its YouTube channel ID"
 - "Show audience retention for video XXXXXXX from last week"
 - "What are the top 10 traffic sources for my Shorts?"
 - "Give me daily views for the last 30 days"

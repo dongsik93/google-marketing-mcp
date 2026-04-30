@@ -155,6 +155,78 @@ export class YouTubeClient {
     }));
   }
 
+  /** @handle / channel URL / UC... 값을 실제 채널 ID로 해석 */
+  async resolveChannel(identifier: string) {
+    const normalized = identifier.trim();
+    const ucMatch = normalized.match(/UC[a-zA-Z0-9_-]{20,}/);
+    if (ucMatch) {
+      const res = await this.youtube.channels.list({
+        part: ["snippet", "statistics"],
+        id: [ucMatch[0]],
+      });
+      return (res.data.items || []).map((c) => ({
+        id: c.id,
+        title: c.snippet?.title,
+        customUrl: c.snippet?.customUrl,
+        subscriberCount: c.statistics?.subscriberCount,
+        viewCount: c.statistics?.viewCount,
+        videoCount: c.statistics?.videoCount,
+        matchType: "channelId",
+      }));
+    }
+
+    const handleMatch =
+      normalized.match(/youtube\.com\/@([a-zA-Z0-9._-]+)/) ||
+      normalized.match(/^@([a-zA-Z0-9._-]+)$/);
+
+    if (handleMatch) {
+      const handle = handleMatch[1];
+      const res = await this.youtube.channels.list({
+        part: ["snippet", "statistics"],
+        ...( { forHandle: handle } as any ),
+      } as any);
+      if (res.data.items?.length) {
+        return res.data.items.map((c) => ({
+          id: c.id,
+          title: c.snippet?.title,
+          customUrl: c.snippet?.customUrl,
+          subscriberCount: c.statistics?.subscriberCount,
+          viewCount: c.statistics?.viewCount,
+          videoCount: c.statistics?.videoCount,
+          matchType: "handle",
+        }));
+      }
+    }
+
+    const query = normalized
+      .replace(/^https?:\/\/(www\.)?youtube\.com\//, "")
+      .replace(/^@/, "");
+    const res = await this.youtube.search.list({
+      part: ["snippet"],
+      q: query,
+      type: ["channel"],
+      maxResults: 5,
+    });
+    const channelIds = (res.data.items || [])
+      .map((it) => it.snippet?.channelId)
+      .filter((id): id is string => !!id);
+    if (channelIds.length === 0) return [];
+
+    const channelRes = await this.youtube.channels.list({
+      part: ["snippet", "statistics"],
+      id: channelIds,
+    });
+    return (channelRes.data.items || []).map((c) => ({
+      id: c.id,
+      title: c.snippet?.title,
+      customUrl: c.snippet?.customUrl,
+      subscriberCount: c.statistics?.subscriberCount,
+      viewCount: c.statistics?.viewCount,
+      videoCount: c.statistics?.videoCount,
+      matchType: "search",
+    }));
+  }
+
   // ── Analytics API v2 ─────────────────────────────────────────────────────
 
   /** 범용 Analytics 리포트 — Studio 데이터 정확히 재현 */

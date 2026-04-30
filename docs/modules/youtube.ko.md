@@ -13,6 +13,7 @@
 | `yt_list_videos` | 채널 영상 목록 (최신 N개) — 제목, 발행일, 길이, 조회수, 좋아요, 댓글, 공개 상태 |
 | `yt_video_stats` | 1개 또는 다중 영상 상세 정보 (제목·설명·태그·길이·통계·카테고리) |
 | `yt_search_videos` | 채널 내 영상 검색 (제목/설명 키워드) |
+| `yt_resolve_channel` | `@handle`, 채널 URL, `UC...` 채널 ID를 실제 채널 메타데이터로 해석. `YT_CHANNEL_ID` 설정 전 검증용 |
 
 **성과 & 시청자 (Analytics API v2)**
 | 도구 | 설명 |
@@ -41,6 +42,7 @@
 
 - [YouTube Studio](https://studio.youtube.com/) → 설정 → 채널 → 고급 설정 → **채널 ID**
 - 또는 채널 페이지 URL 확인: `youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx`
+- 또는 `yt_resolve_channel`에 `@핸들`을 넣어 확인
 - 형식: `UC` + 22자
 
 ### 3. 환경변수
@@ -71,6 +73,7 @@ YouTube 첫 호출 시 브라우저가 `prompt=select_account` 로 열려 Brand 
 ## 사용 예시
 
 - "최근 20개 영상 조회수랑 같이 보여줘"
+- "@mychannel의 실제 YouTube 채널 ID 확인해줘"
 - "영상 XXXXXXX 지난주 시청 유지율 그래프 보여줘"
 - "내 숏츠 트래픽 소스 TOP 10"
 - "지난 30일 일별 조회수 추이"

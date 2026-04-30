@@ -129,7 +129,7 @@ const instructions = [
 
 const server = new McpServer({
   name: "google-marketing-mcp",
-  version: "0.4.1",
+  version: "0.4.2",
   ...(instructions ? { instructions } : {}),
 });
 
@@ -154,6 +154,56 @@ const dimensionFilterSchema = z
   )
   .optional()
   .describe("디멘션 필터 목록");
+
+// ── Common Tools ───────────────────────────────────────────────────────────
+
+server.tool(
+  "status",
+  "MCP 서버 상태와 활성화된 모듈/env 설정 확인. 비밀값은 노출하지 않고 설정 여부만 반환.",
+  {},
+  async () => {
+    const modules = {
+      ga4: {
+        enabled: ENABLE_GA4,
+        configured: !!DEFAULT_GA4_PROPERTY_ID,
+        propertyId: DEFAULT_GA4_PROPERTY_ID || null,
+      },
+      gsc: {
+        enabled: ENABLE_GSC,
+        configured: !!DEFAULT_GSC_SITE_URL,
+        siteUrl: DEFAULT_GSC_SITE_URL || null,
+      },
+      ads: {
+        enabled: ENABLE_ADS,
+        configured: !!DEVELOPER_TOKEN,
+        customerId: DEFAULT_ADS_CUSTOMER_ID || null,
+        loginCustomerId: DEFAULT_ADS_LOGIN_CUSTOMER_ID || null,
+      },
+      youtube: {
+        enabled: ENABLE_YT,
+        configured: !!DEFAULT_YT_CHANNEL_ID,
+        channelId: DEFAULT_YT_CHANNEL_ID || null,
+      },
+    };
+
+    return {
+      content: [{
+        type: "text",
+        text: JSON.stringify({
+          name: "google-marketing-mcp",
+          version: "0.4.2",
+          clientSecretPathConfigured: !!CLIENT_SECRET_PATH,
+          modules,
+          notes: [
+            "GA4/GSC/Ads use ~/.google-marketing-mcp/token.json.",
+            "YouTube uses ~/.google-marketing-mcp/token.youtube.json for Brand Account compatibility.",
+            "YouTube Studio realtime metrics such as valid views and viewed-vs-swiped-away are not fully exposed by the public YouTube Analytics API.",
+          ],
+        }, null, 2),
+      }],
+    };
+  }
+);
 
 // ── GA4 Tools (GA4_PROPERTY_ID 있을 때만 등록 / 호환을 위해 다른 모듈 모두 비활성 시에도 등록) ──
 
@@ -241,6 +291,27 @@ server.tool(
   async ({ propertyId, startDate, endDate, limit }) => {
     const client = await getGA4();
     const result = await client.getTrafficSources(resolvePropertyId(propertyId), startDate, endDate, limit);
+    return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+  }
+);
+
+server.tool(
+  "check_youtube_ga4_traffic",
+  "GA4에서 YouTube/Shorts 유입만 필터링해 확인. sessionSource/sessionMedium/campaign/landingPage에 youtube, youtu.be, shorts가 포함된 행만 반환.",
+  {
+    propertyId: propertyIdSchema,
+    startDate: z.string().describe("시작일 (YYYY-MM-DD 또는 7daysAgo 등)"),
+    endDate: z.string().describe("종료일 (YYYY-MM-DD 또는 today 등)"),
+    limit: z.number().optional().describe("최대 행 수 (기본 50)"),
+  },
+  async ({ propertyId, startDate, endDate, limit }) => {
+    const client = await getGA4();
+    const result = await client.getYoutubeTraffic(
+      resolvePropertyId(propertyId),
+      startDate,
+      endDate,
+      limit ?? 50
+    );
     return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
   }
 );
@@ -1293,6 +1364,19 @@ if (ENABLE_YT) {
     async ({ channelId, query, maxResults }) => {
       const client = await getYT();
       const result = await client.searchVideos(resolveChannelId(channelId), query, maxResults ?? 25);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_resolve_channel",
+    "YouTube @handle, 채널 URL, UC 채널 ID를 실제 채널 ID/제목/통계로 해석. YT_CHANNEL_ID 설정 전 검증에 유용.",
+    {
+      identifier: z.string().describe("예: @miju30com, https://www.youtube.com/@miju30com, UCxxxx..."),
+    },
+    async ({ identifier }) => {
+      const client = await getYT();
+      const result = await client.resolveChannel(identifier);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     }
   );

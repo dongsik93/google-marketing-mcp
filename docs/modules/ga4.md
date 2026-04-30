@@ -18,6 +18,7 @@ Activated by setting `GA4_PROPERTY_ID`.
 |---|---|
 | `get_top_pages` | Top pages by pageviews, sessions, avg. duration, bounce rate |
 | `get_traffic_sources` | Traffic source breakdown by source/medium |
+| `check_youtube_ga4_traffic` | Filter GA4 sessions related to YouTube/Shorts (`youtube`, `youtu.be`, `shorts`) across source, medium, campaign, and landing page |
 
 **User Analysis**
 | Tool | Description |
@@ -73,6 +74,7 @@ Activated by setting `GA4_PROPERTY_ID`.
 
 - "Show me sessions and new users by date for the last 7 days"
 - "Break down traffic sources for this month"
+- "Check whether YouTube Shorts traffic is showing up in GA4 for the last 7 days"
 - "How many users are active right now?"
 - "Show top 10 pages by pageviews for the last 30 days"
 - "Compare campaign A vs campaign B last month"

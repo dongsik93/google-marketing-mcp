@@ -103,6 +103,44 @@ export class GA4Client {
     });
   }
 
+  async getYoutubeTraffic(
+    propertyId: string,
+    startDate: string,
+    endDate: string,
+    limit = 50
+  ) {
+    const result = await this.runReport({
+      propertyId,
+      startDate,
+      endDate,
+      metrics: ["sessions", "totalUsers", "newUsers", "screenPageViews", "averageSessionDuration", "bounceRate"],
+      dimensions: ["sessionSource", "sessionMedium", "sessionCampaignName", "landingPagePlusQueryString"],
+      limit: Math.max(limit * 3, 100),
+      orderBy: "sessions",
+    });
+
+    const needles = ["youtube", "youtu.be", "shorts"];
+    const rows = result.rows.filter((row: Record<string, string>) => {
+      const text = [
+        row.sessionSource,
+        row.sessionMedium,
+        row.sessionCampaignName,
+        row.landingPagePlusQueryString,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return needles.some((needle) => text.includes(needle));
+    });
+
+    return {
+      ...result,
+      rows: rows.slice(0, limit),
+      rowCount: rows.length,
+      note:
+        "Filtered for youtube / youtu.be / shorts in sessionSource, sessionMedium, sessionCampaignName, and landingPagePlusQueryString.",
+    };
+  }
+
   async getUserOverview(propertyId: string, startDate: string, endDate: string) {
     return this.runReport({
       propertyId, startDate, endDate,

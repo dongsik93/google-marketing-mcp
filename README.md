@@ -14,15 +14,22 @@ npx -y @dongsik/google-marketing-mcp
 
 > **v0.4.0 note** — YouTube now uses a **separate OAuth token** (`token.youtube.json`) so it can authorize against a Brand Account without conflicting with the personal Google account used by GA4/GSC. GA4/GSC/Ads users are unaffected. v0.3.0 YouTube users re-authorize once on the next YouTube call. See [CHANGELOG](./CHANGELOG.md).
 
+> **v0.4.2 note** — Adds non-breaking helper tools: `status`, `yt_resolve_channel`, and `check_youtube_ga4_traffic`.
+
 ## Modules
 
 | Module | Activates with | Tools | Docs |
 |---|---|---|---|
-| **Google Analytics 4** | `GA4_PROPERTY_ID` | 20 | [docs](./docs/modules/ga4.md) |
+| **Common** | always | 1 | this README |
+| **Google Analytics 4** | `GA4_PROPERTY_ID` | 21 | [docs](./docs/modules/ga4.md) |
 | **Google Search Console** | `GSC_SITE_URL` | 7 | [docs](./docs/modules/gsc.md) |
 | **Google Ads** | `GOOGLE_ADS_DEVELOPER_TOKEN` | 12 | [docs](./docs/modules/ads.md) |
-| **YouTube** (Data + Analytics) | `YT_CHANNEL_ID` | 16 | [docs](./docs/modules/youtube.md) |
+| **YouTube** (Data + Analytics) | `YT_CHANNEL_ID` | 17 | [docs](./docs/modules/youtube.md) |
 | **GA4 × Ads combined** | both above | 7 | [docs](./docs/modules/combined.md) |
+
+Common helper:
+
+- `status`: checks which modules are enabled and which env values are configured without printing secrets.
 
 ## Common Setup
 
