@@ -49,6 +49,25 @@
 |---|---|---|
 | `YT_CHANNEL_ID` | ✅ | 기본 YouTube Channel ID. 설정하면 모듈 활성화 |
 
+### 4. 토큰 분리 (v0.4.0+)
+
+YouTube는 GA4/GSC/Ads와 **별도 OAuth 토큰**을 사용합니다. YouTube 채널이 **Brand Account** 산하인 반면 GA/GSC는 개인 Google 계정인 흔한 케이스를 충돌 없이 처리하기 위함.
+
+| 파일 | 모듈 |
+|---|---|
+| `~/.google-marketing-mcp/token.json` | GA4, GSC, Ads |
+| `~/.google-marketing-mcp/token.youtube.json` | YouTube 전용 |
+
+YouTube 첫 호출 시 브라우저가 `prompt=select_account` 로 열려 Brand Account를 직접 선택할 수 있습니다. 재인증은 `token.youtube.json` 삭제 후 호출.
+
+### 5. Brand Account 주의사항
+
+채널이 Google Brand Account 소유이고 OAuth 단계에서 **"이 서비스를 사용할 수 없습니다"** 가 뜨면:
+
+- [Google Cloud Console → OAuth 동의 화면](https://console.cloud.google.com/apis/credentials/consent) 접속
+- **테스트(Testing)** 상태면 **테스트 사용자**에 Brand Account 이메일 추가
+- 또는 **In production** 으로 게시 (sensitive scope 사용 시 Google 검증 필요)
+
 ## 사용 예시
 
 - "최근 20개 영상 조회수랑 같이 보여줘"

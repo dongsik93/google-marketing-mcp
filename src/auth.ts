@@ -10,11 +10,18 @@ const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
 const YT_SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
 const YT_ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly";
 
+export type AuthProfile = "default" | "youtube";
+
 const TOKEN_DIR = path.join(
   process.env.HOME || process.env.USERPROFILE || ".",
   ".google-marketing-mcp"
 );
-const TOKEN_PATH = path.join(TOKEN_DIR, "token.json");
+
+function tokenPath(profile: AuthProfile): string {
+  return profile === "youtube"
+    ? path.join(TOKEN_DIR, "token.youtube.json")
+    : path.join(TOKEN_DIR, "token.json");
+}
 
 interface ClientCredentials {
   client_id: string;
@@ -34,20 +41,20 @@ function loadClientCredentials(clientSecretPath: string): ClientCredentials {
   return creds;
 }
 
-function loadSavedToken(): any | null {
+function loadSavedToken(profile: AuthProfile): any | null {
   try {
-    const content = fs.readFileSync(TOKEN_PATH, "utf-8");
+    const content = fs.readFileSync(tokenPath(profile), "utf-8");
     return JSON.parse(content);
   } catch {
     return null;
   }
 }
 
-function saveToken(token: any): void {
+function saveToken(token: any, profile: AuthProfile): void {
   if (!fs.existsSync(TOKEN_DIR)) {
     fs.mkdirSync(TOKEN_DIR, { recursive: true });
   }
-  fs.writeFileSync(TOKEN_PATH, JSON.stringify(token, null, 2));
+  fs.writeFileSync(tokenPath(profile), JSON.stringify(token, null, 2));
 }
 
 function tokenHasScope(token: any, scope: string): boolean {
@@ -55,22 +62,29 @@ function tokenHasScope(token: any, scope: string): boolean {
   return token.scope.includes(scope);
 }
 
-function buildScopes(): string[] {
+/**
+ * 프로필별 scope 빌드.
+ *  - "default": GA4/GSC/Ads 묶음. 기존 사용자 호환을 위해 유지.
+ *    YT 환경변수가 있어도 default 토큰엔 YT scope를 추가하지 않는다 (별도 토큰 사용).
+ *  - "youtube": YT readonly + YT Analytics. 별도 OAuth 흐름 (Brand Account 대응).
+ */
+function buildScopes(profile: AuthProfile): string[] {
   const scopes: string[] = [];
-  // 각 모듈은 해당 환경변수가 있을 때만 스코프 요청 (불필요한 권한 요구 회피).
-  // 셋 중 하나도 활성화 안 됐으면 GA4 디폴트로 켜둔다 (가장 흔한 사용 케이스).
+
+  if (profile === "youtube") {
+    scopes.push(YT_SCOPE);
+    scopes.push(YT_ANALYTICS_SCOPE);
+    return scopes;
+  }
+
+  // default profile
   const enableGA4 = !!process.env.GA4_PROPERTY_ID;
   const enableGSC = !!process.env.GSC_SITE_URL;
   const enableAds = !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
-  const enableYT = !!process.env.YT_CHANNEL_ID;
 
   if (enableGA4) scopes.push(GA4_SCOPE);
   if (enableGSC) scopes.push(GSC_SCOPE);
   if (enableAds) scopes.push(ADS_SCOPE);
-  if (enableYT) {
-    scopes.push(YT_SCOPE);
-    scopes.push(YT_ANALYTICS_SCOPE);
-  }
 
   if (scopes.length === 0) {
     // 아무것도 활성화 안 됨 — GA4 디폴트로 (기존 사용자 호환)
@@ -81,12 +95,17 @@ function buildScopes(): string[] {
 
 async function authorizeViaLocalServer(
   oauth2Client: OAuth2Client,
-  scopes: string[]
+  scopes: string[],
+  profile: AuthProfile
 ): Promise<void> {
+  // YouTube 프로필은 항상 계정 선택 화면을 강제 (Brand Account 선택 가능하도록).
+  // default 프로필은 기존 동작 유지 (consent only).
+  const promptValue = profile === "youtube" ? "select_account consent" : "consent";
+
   const authUrl = oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: scopes,
-    prompt: "consent",
+    prompt: promptValue,
   });
 
   return new Promise((resolve, reject) => {
@@ -103,11 +122,11 @@ async function authorizeViaLocalServer(
 
         const { tokens } = await oauth2Client.getToken(code);
         oauth2Client.setCredentials(tokens);
-        saveToken(tokens);
+        saveToken(tokens, profile);
 
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
-          "<h1>인증 완료!</h1><p>이 창을 닫아도 됩니다.</p><script>window.close()</script>"
+          `<h1>인증 완료! (${profile})</h1><p>이 창을 닫아도 됩니다.</p><script>window.close()</script>`
         );
 
         server.close();
@@ -133,11 +152,17 @@ async function authorizeViaLocalServer(
   });
 }
 
+/**
+ * 프로필별 OAuth 클라이언트 반환.
+ * profile="default" → token.json (GA4/GSC/Ads)
+ * profile="youtube" → token.youtube.json (YouTube 전용, Brand Account 대응)
+ */
 export async function getAuthenticatedClient(
-  clientSecretPath: string
+  clientSecretPath: string,
+  profile: AuthProfile = "default"
 ): Promise<OAuth2Client> {
   const creds = loadClientCredentials(clientSecretPath);
-  const scopes = buildScopes();
+  const scopes = buildScopes(profile);
 
   const oauth2Client = new OAuth2Client(
     creds.client_id,
@@ -145,13 +170,12 @@ export async function getAuthenticatedClient(
     "http://localhost:3000"
   );
 
-  const savedToken = loadSavedToken();
+  const savedToken = loadSavedToken(profile);
   if (savedToken) {
     // 활성화한 모듈의 스코프가 기존 토큰에 빠져있으면 재인증.
-    // 다른 모듈만 쓰던 사용자가 새 모듈 켰을 때만 OAuth 다시 돌게 한다.
     const missingScope = scopes.find((s) => !tokenHasScope(savedToken, s));
     if (missingScope) {
-      await authorizeViaLocalServer(oauth2Client, scopes);
+      await authorizeViaLocalServer(oauth2Client, scopes, profile);
       return oauth2Client;
     }
 
@@ -161,21 +185,21 @@ export async function getAuthenticatedClient(
       try {
         const { credentials } = await oauth2Client.refreshAccessToken();
         oauth2Client.setCredentials(credentials);
-        saveToken(credentials);
+        saveToken(credentials, profile);
       } catch {
-        await authorizeViaLocalServer(oauth2Client, scopes);
+        await authorizeViaLocalServer(oauth2Client, scopes, profile);
       }
     }
 
     return oauth2Client;
   }
 
-  await authorizeViaLocalServer(oauth2Client, scopes);
+  await authorizeViaLocalServer(oauth2Client, scopes, profile);
   return oauth2Client;
 }
 
 export function getRefreshToken(): string {
-  const token = loadSavedToken();
+  const token = loadSavedToken("default");
   if (!token?.refresh_token) {
     throw new Error("No refresh token found. Run authentication first.");
   }

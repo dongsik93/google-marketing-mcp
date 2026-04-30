@@ -49,7 +49,10 @@ async function getGSC(): Promise<GSCClient> {
 
 async function getYT(): Promise<YouTubeClient> {
   if (!yt) {
-    const auth = await getAuthenticatedClient(CLIENT_SECRET_PATH);
+    // YouTube는 별도 토큰 프로필 사용 (Brand Account 대응).
+    // GA4/GSC/Ads와 토큰을 공유하지 않으므로, 이 호출에서 처음 인증할 때
+    // 브라우저에 계정 선택 화면이 강제로 떠서 Brand 채널을 직접 선택할 수 있다.
+    const auth = await getAuthenticatedClient(CLIENT_SECRET_PATH, "youtube");
     yt = new YouTubeClient(auth);
   }
   return yt;
@@ -126,7 +129,7 @@ const instructions = [
 
 const server = new McpServer({
   name: "google-marketing-mcp",
-  version: "0.3.0",
+  version: "0.4.0",
   ...(instructions ? { instructions } : {}),
 });
 

@@ -49,6 +49,25 @@ Activated by setting `YT_CHANNEL_ID`.
 |---|---|---|
 | `YT_CHANNEL_ID` | ✅ | Default YouTube Channel ID. Setting this enables the module |
 
+### 4. Token isolation (v0.4.0+)
+
+YouTube uses a **separate OAuth token** from GA4/GSC/Ads. This avoids conflicts when YouTube needs to authorize against a **Brand Account** while GA/GSC use a personal Google account.
+
+| File | Modules |
+|---|---|
+| `~/.google-marketing-mcp/token.json` | GA4, GSC, Ads |
+| `~/.google-marketing-mcp/token.youtube.json` | YouTube only |
+
+On first YouTube call, the browser opens with `prompt=select_account` so you can pick the Brand Account that owns the channel. Re-authenticate by deleting `token.youtube.json`.
+
+### 5. Brand Account note
+
+If your channel is owned by a Google Brand Account and you see **"This service is not available"** during OAuth:
+
+- Open [Google Cloud Console → OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+- If status is **Testing**, add your Brand Account email to **Test users**
+- Or push the app to **In production** (requires Google verification for sensitive scopes like `youtube.readonly`)
+
 ## Usage Examples
 
 - "List my latest 20 videos with view counts"
