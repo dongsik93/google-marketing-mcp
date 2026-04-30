@@ -1,7 +1,7 @@
 {
   "name": "@dongsik/google-marketing-mcp",
-  "version": "0.2.0",
-  "description": "MCP server for Google Analytics 4, Google Search Console, and Google Ads. Each module is independently activated by environment variables.",
+  "version": "0.3.0",
+  "description": "MCP server for Google Analytics 4, Google Search Console, Google Ads, and YouTube (Data + Analytics). Each module is independently activated by environment variables.",
   "keywords": [
     "mcp",
     "model-context-protocol",
@@ -11,6 +11,8 @@
     "search-console",
     "gsc",
     "google-ads",
+    "youtube",
+    "youtube-analytics",
     "marketing"
   ],
   "homepage": "https://github.com/dongsik93/ga_ads_mcp#readme",

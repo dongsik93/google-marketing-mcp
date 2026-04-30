@@ -7,6 +7,8 @@ import open from "open";
 const GA4_SCOPE = "https://www.googleapis.com/auth/analytics.readonly";
 const ADS_SCOPE = "https://www.googleapis.com/auth/adwords";
 const GSC_SCOPE = "https://www.googleapis.com/auth/webmasters.readonly";
+const YT_SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
+const YT_ANALYTICS_SCOPE = "https://www.googleapis.com/auth/yt-analytics.readonly";
 
 const TOKEN_DIR = path.join(
   process.env.HOME || process.env.USERPROFILE || ".",
@@ -60,10 +62,15 @@ function buildScopes(): string[] {
   const enableGA4 = !!process.env.GA4_PROPERTY_ID;
   const enableGSC = !!process.env.GSC_SITE_URL;
   const enableAds = !!process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+  const enableYT = !!process.env.YT_CHANNEL_ID;
 
   if (enableGA4) scopes.push(GA4_SCOPE);
   if (enableGSC) scopes.push(GSC_SCOPE);
   if (enableAds) scopes.push(ADS_SCOPE);
+  if (enableYT) {
+    scopes.push(YT_SCOPE);
+    scopes.push(YT_ANALYTICS_SCOPE);
+  }
 
   if (scopes.length === 0) {
     // 아무것도 활성화 안 됨 — GA4 디폴트로 (기존 사용자 호환)

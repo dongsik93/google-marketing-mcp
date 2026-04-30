@@ -7,6 +7,7 @@ import { getAuthenticatedClient, getRefreshToken } from "./auth.js";
 import { GA4Client } from "./ga4.js";
 import { GoogleAdsClient } from "./gads.js";
 import { GSCClient } from "./gsc.js";
+import { YouTubeClient } from "./youtube.js";
 
 const CLIENT_SECRET_PATH =
   process.env.GA_CLIENT_SECRET_PATH ||
@@ -17,15 +18,18 @@ const DEFAULT_GSC_SITE_URL = process.env.GSC_SITE_URL || "";
 const DEFAULT_ADS_CUSTOMER_ID = process.env.GOOGLE_ADS_CUSTOMER_ID || "";
 const DEFAULT_ADS_LOGIN_CUSTOMER_ID = process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "";
 const DEVELOPER_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN || "";
+const DEFAULT_YT_CHANNEL_ID = process.env.YT_CHANNEL_ID || "";
 
 // 모듈 활성화 플래그 — 환경변수 없으면 해당 도구는 등록 안 함
-const ENABLE_GA4 = !!DEFAULT_GA4_PROPERTY_ID || (!DEFAULT_GSC_SITE_URL && !DEVELOPER_TOKEN);
+const ENABLE_GA4 = !!DEFAULT_GA4_PROPERTY_ID || (!DEFAULT_GSC_SITE_URL && !DEVELOPER_TOKEN && !DEFAULT_YT_CHANNEL_ID);
 const ENABLE_GSC = !!DEFAULT_GSC_SITE_URL;
 const ENABLE_ADS = !!DEVELOPER_TOKEN;
+const ENABLE_YT = !!DEFAULT_YT_CHANNEL_ID;
 
 let ga4: GA4Client | null = null;
 let gads: GoogleAdsClient | null = null;
 let gsc: GSCClient | null = null;
+let yt: YouTubeClient | null = null;
 
 async function getGA4(): Promise<GA4Client> {
   if (!ga4) {
@@ -41,6 +45,24 @@ async function getGSC(): Promise<GSCClient> {
     gsc = new GSCClient(auth);
   }
   return gsc;
+}
+
+async function getYT(): Promise<YouTubeClient> {
+  if (!yt) {
+    const auth = await getAuthenticatedClient(CLIENT_SECRET_PATH);
+    yt = new YouTubeClient(auth);
+  }
+  return yt;
+}
+
+function resolveChannelId(channelId?: string): string {
+  const id = channelId || DEFAULT_YT_CHANNEL_ID;
+  if (!id) {
+    throw new Error(
+      "channelId가 필요합니다. 파라미터로 전달하거나 YT_CHANNEL_ID 환경변수를 설정하세요. (예: UCxxxxxxxxxxxxxxxxxxxxxx)"
+    );
+  }
+  return id;
 }
 
 function resolveSiteUrl(siteUrl?: string): string {
@@ -95,13 +117,16 @@ const instructions = [
   DEFAULT_ADS_CUSTOMER_ID
     ? `GOOGLE_ADS_CUSTOMER_ID=${DEFAULT_ADS_CUSTOMER_ID} 환경변수가 설정되어 있습니다. 사용자가 명시적으로 계정 목록을 요청하지 않는 한 ads_list_campaigns 등 데이터 tool을 바로 호출하세요.`
     : null,
+  DEFAULT_YT_CHANNEL_ID
+    ? `YT_CHANNEL_ID=${DEFAULT_YT_CHANNEL_ID} 환경변수가 설정되어 있습니다. 사용자가 명시적으로 채널 목록을 요청하지 않는 한 yt_list_my_channels를 호출하지 말고 바로 yt_top_videos / yt_analytics_summary 같은 데이터 tool을 사용하세요.`
+    : null,
 ]
   .filter(Boolean)
   .join("\n");
 
 const server = new McpServer({
   name: "google-marketing-mcp",
-  version: "0.2.0",
+  version: "0.3.0",
   ...(instructions ? { instructions } : {}),
 });
 
@@ -1205,6 +1230,333 @@ if (DEVELOPER_TOKEN) {
   );
 
 } // end if (DEVELOPER_TOKEN)
+
+// ── YouTube Tools (YT_CHANNEL_ID 있을 때만 등록) ──────────────────────────
+
+const channelIdSchema = DEFAULT_YT_CHANNEL_ID
+  ? z.string().optional().describe("YouTube 채널 ID (UCxxxx... · 미입력 시 환경변수 YT_CHANNEL_ID 사용)")
+  : z.string().describe("YouTube 채널 ID (UCxxxxxxxxxxxxxxxxxxxxxx 형식)");
+
+if (ENABLE_YT) {
+
+  server.tool(
+    "yt_list_my_channels",
+    DEFAULT_YT_CHANNEL_ID
+      ? "인증된 사용자가 소유한 YouTube 채널 목록. 주의: YT_CHANNEL_ID 환경변수가 이미 설정되어 있으므로 사용자가 명시적으로 목록을 요청하지 않는 한 호출하지 말 것."
+      : "인증된 사용자가 소유한 YouTube 채널 목록 (구독자/조회수/영상수/uploads 플레이리스트 ID 포함)",
+    {},
+    async () => {
+      const client = await getYT();
+      const result = await client.listMyChannels();
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_list_videos",
+    "채널 영상 목록 (최신 N개) — 제목, 발행일, 길이, 조회수, 좋아요, 댓글, 공개상태",
+    {
+      channelId: channelIdSchema,
+      maxResults: z.number().optional().describe("최대 영상 수 (기본 50)"),
+    },
+    async ({ channelId, maxResults }) => {
+      const client = await getYT();
+      const result = await client.listChannelVideos(resolveChannelId(channelId), maxResults ?? 50);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_video_stats",
+    "영상 1개 또는 다중 영상의 상세 정보 (제목·설명·태그·길이·통계·카테고리). videoIds 배열로 전달.",
+    {
+      videoIds: z.array(z.string()).describe("YouTube 영상 ID 배열 (최대 50개씩 자동 청크)"),
+    },
+    async ({ videoIds }) => {
+      const client = await getYT();
+      const result = await client.getVideoStats(videoIds);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_search_videos",
+    "채널 내 영상 검색 (제목·설명 키워드)",
+    {
+      channelId: channelIdSchema,
+      query: z.string().describe("검색어"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 25)"),
+    },
+    async ({ channelId, query, maxResults }) => {
+      const client = await getYT();
+      const result = await client.searchVideos(resolveChannelId(channelId), query, maxResults ?? 25);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_analytics_summary",
+    "채널 또는 특정 영상의 핵심 지표 요약 (조회수·시청시간·평균지속·평균조회율·구독·좋아요·댓글·공유). videoId 미입력 시 채널 전체.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일 (YYYY-MM-DD)"),
+      endDate: z.string().describe("종료일 (YYYY-MM-DD)"),
+      videoId: z.string().optional().describe("특정 영상으로 필터 (미입력 시 채널 전체)"),
+    },
+    async ({ channelId, startDate, endDate, videoId }) => {
+      const client = await getYT();
+      const result = await client.getReportSummary(resolveChannelId(channelId), startDate, endDate, videoId);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_analytics_report",
+    "범용 YouTube Analytics 리포트 — 원하는 metrics·dimensions·filters 자유 조합. Studio에서 보는 모든 지표 가능.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일 (YYYY-MM-DD)"),
+      endDate: z.string().describe("종료일 (YYYY-MM-DD)"),
+      metrics: z.array(z.string()).describe("메트릭 (예: views, estimatedMinutesWatched, averageViewDuration, averageViewPercentage, subscribersGained, likes, shares, cardClickRate, annotationClickThroughRate)"),
+      dimensions: z.array(z.string()).optional().describe("디멘션 (예: video, day, country, deviceType, insightTrafficSourceType, ageGroup, gender, sharingService, playlist, elapsedVideoTimeRatio)"),
+      filters: z.string().optional().describe("필터 (예: 'video==XXXX', 'country==US;deviceType==MOBILE')"),
+      sort: z.string().optional().describe("정렬 (예: '-views', 'day')"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 100)"),
+    },
+    async (params) => {
+      const client = await getYT();
+      const result = await client.runAnalyticsReport({
+        ...params,
+        channelId: resolveChannelId(params.channelId),
+      });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_traffic_sources",
+    "트래픽 소스별 조회수 (YT_SEARCH·SHORTS·SUGGESTED_VIDEO·BROWSE·EXTERNAL 등). videoId 미입력 시 채널 전체.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      videoId: z.string().optional().describe("특정 영상으로 필터"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 25)"),
+    },
+    async ({ channelId, startDate, endDate, videoId, maxResults }) => {
+      const client = await getYT();
+      const result = await client.getTrafficSources(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        videoId,
+        maxResults ?? 25
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_audience_retention",
+    "영상 시청자 유지율 — 초별 이탈 지점 그래프 (audienceWatchRatio · relativeRetentionPerformance). Hook/CTA 효과 정량 분석 핵심.",
+    {
+      channelId: channelIdSchema,
+      videoId: z.string().describe("분석할 영상 ID"),
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+    },
+    async ({ channelId, videoId, startDate, endDate }) => {
+      const client = await getYT();
+      const result = await client.getAudienceRetention(
+        resolveChannelId(channelId),
+        videoId,
+        startDate,
+        endDate
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_demographics",
+    "시청자 인구통계 (연령·성별 비율). videoId 미입력 시 채널 전체.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      videoId: z.string().optional().describe("특정 영상으로 필터"),
+    },
+    async ({ channelId, startDate, endDate, videoId }) => {
+      const client = await getYT();
+      const result = await client.getDemographics(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        videoId
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_views_by_country",
+    "국가별 조회수·시청시간·평균지속. videoId 미입력 시 채널 전체.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      videoId: z.string().optional().describe("특정 영상으로 필터"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 25)"),
+    },
+    async ({ channelId, startDate, endDate, videoId, maxResults }) => {
+      const client = await getYT();
+      const result = await client.getViewsByCountry(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        videoId,
+        maxResults ?? 25
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_views_by_device",
+    "기기별 조회수 (DESKTOP / MOBILE / TABLET / TV / GAME_CONSOLE).",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      videoId: z.string().optional().describe("특정 영상으로 필터"),
+    },
+    async ({ channelId, startDate, endDate, videoId }) => {
+      const client = await getYT();
+      const result = await client.getViewsByDevice(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        videoId
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_daily_trend",
+    "일별 추이 (조회수·시청시간·평균지속·구독 증감·좋아요). videoId 미입력 시 채널 전체.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      videoId: z.string().optional().describe("특정 영상으로 필터"),
+    },
+    async ({ channelId, startDate, endDate, videoId }) => {
+      const client = await getYT();
+      const result = await client.getDailyTrend(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        videoId
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_top_videos",
+    "기간 내 채널 상위 영상 — 조회수·시청시간·평균지속·평균조회율·좋아요·구독 증가.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 25)"),
+      sortMetric: z
+        .enum(["views", "estimatedMinutesWatched", "averageViewDuration", "averageViewPercentage", "subscribersGained", "likes"])
+        .optional()
+        .describe("정렬 기준 메트릭 (기본 views)"),
+    },
+    async ({ channelId, startDate, endDate, maxResults, sortMetric }) => {
+      const client = await getYT();
+      const result = await client.getTopVideos(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        maxResults ?? 25,
+        sortMetric ?? "views"
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_search_terms",
+    "시청자가 영상을 찾은 검색어 (YouTube 검색 트래픽). videoId 미입력 시 채널 전체.",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      videoId: z.string().optional().describe("특정 영상으로 필터"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 50)"),
+    },
+    async ({ channelId, startDate, endDate, videoId, maxResults }) => {
+      const client = await getYT();
+      const result = await client.getSearchTerms(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        videoId,
+        maxResults ?? 50
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_sharing_services",
+    "공유 서비스별 공유 횟수 (Twitter, Reddit, Facebook, Copy URL 등).",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      videoId: z.string().optional().describe("특정 영상으로 필터"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 25)"),
+    },
+    async ({ channelId, startDate, endDate, videoId, maxResults }) => {
+      const client = await getYT();
+      const result = await client.getSharingServices(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        videoId,
+        maxResults ?? 25
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+  server.tool(
+    "yt_playlist_performance",
+    "재생목록 성과 (조회수·평균 재생목록 시간·재생목록 시작수·시작당 조회수).",
+    {
+      channelId: channelIdSchema,
+      startDate: z.string().describe("시작일"),
+      endDate: z.string().describe("종료일"),
+      maxResults: z.number().optional().describe("최대 결과 수 (기본 25)"),
+    },
+    async ({ channelId, startDate, endDate, maxResults }) => {
+      const client = await getYT();
+      const result = await client.getPlaylistPerformance(
+        resolveChannelId(channelId),
+        startDate,
+        endDate,
+        maxResults ?? 25
+      );
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    }
+  );
+
+} // end if (ENABLE_YT)
 
 // ── Start ───────────────────────────────────────────────────────────────────
 
