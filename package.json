@@ -1,6 +1,6 @@
 {
   "name": "@dongsik/google-marketing-mcp",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "MCP server for Google Analytics 4, Google Search Console, Google Ads, and YouTube (Data + Analytics). Each module is independently activated by environment variables.",
   "keywords": [
     "mcp",

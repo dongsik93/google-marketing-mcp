@@ -16,6 +16,8 @@ npx -y @dongsik/google-marketing-mcp
 
 > **v0.4.2 안내** — 기존 설정을 깨지 않는 보조 도구 `status`, `yt_resolve_channel`, `check_youtube_ga4_traffic` 가 추가됐습니다.
 
+> **v0.4.3 안내** — OAuth 토큰 자동 갱신 버그 수정: 갱신 시 저장된 `refresh_token` 이 덮어써지지 않고, 세션 중 access token 만료가 자동으로 처리됩니다. 별도 작업 불필요. 저장된 토큰에 `refresh_token` 이 아예 없는 경우에만 1회 재인증이 발생합니다.
+
 ## 모듈
 
 | 모듈 | 활성 환경변수 | 도구 수 | 문서 |
@@ -84,6 +86,8 @@ npx -y @dongsik/google-marketing-mcp
 ### 4. 최초 실행
 
 처음 실행 시 브라우저가 자동으로 열려 Google 계정 로그인을 요청합니다. 인증 후 토큰이 `~/.google-marketing-mcp/token.json` 에 저장되어 이후 자동 인증됩니다.
+
+access token은 저장된 `refresh_token` 이 유효한 동안 **자동으로 갱신**되며, 갱신된 토큰은 디스크에 다시 저장됩니다. 재인증은 `refresh_token` 자체가 폐기된 경우에만 필요합니다 (Testing 모드 OAuth 클라이언트의 7일 미사용, 비밀번호 변경, 수동 취소 등).
 
 새 모듈을 추가하면 OAuth 플로우가 다시 한 번 돌아 추가 스코프를 요청합니다.
 

@@ -16,6 +16,8 @@ npx -y @dongsik/google-marketing-mcp
 
 > **v0.4.2 note** — Adds non-breaking helper tools: `status`, `yt_resolve_channel`, and `check_youtube_ga4_traffic`.
 
+> **v0.4.3 note** — Fixes OAuth token auto-refresh: the saved `refresh_token` is no longer overwritten on rotation, and access tokens are refreshed transparently mid-session. No action needed; re-auth only if your saved token never had a `refresh_token`.
+
 ## Modules
 
 | Module | Activates with | Tools | Docs |
@@ -84,6 +86,8 @@ Module-specific env variables are documented in each module's page (linked above
 ### 4. First Run
 
 On first launch, a browser window opens for Google OAuth login. After authentication, the token is saved at `~/.google-marketing-mcp/token.json` — subsequent requests authenticate automatically.
+
+Access tokens are **refreshed transparently** as long as the saved `refresh_token` is valid; the updated token is persisted back to disk. Re-authentication is only required if the `refresh_token` itself is revoked (e.g. 7-day inactivity on Testing-mode OAuth clients, password change, or manual revoke).
 
 If you add a new module after the first run, the OAuth flow runs again to request the new scope.
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.4.3 — 2026-05-13
+
+### Fixed
+- **OAuth token auto-refresh now actually works.** Previously the saved token file's `refresh_token` was silently overwritten on every refresh (Google's refresh response doesn't include it), so the next expiry would fall back to a full re-auth and pop the browser. Tokens are now merged so `refresh_token` is preserved.
+- Long-running sessions no longer require restarting the MCP server when the access token expires mid-use. A `tokens` listener is attached to the OAuth client so the library's automatic refresh is persisted to disk on every rotation.
+- Re-authentication is now only triggered when the saved token has no `refresh_token` at all (revoked / never granted), not on normal expiry.
+
+### Added
+- `forceRefresh(oauth2Client, profile)` exported from `auth.ts` for callers that catch `invalid_grant` / 401 and want to explicitly retry once before bubbling the error.
+
+### Migration
+- No action required. Existing tokens keep working. If your saved token happens to be missing `refresh_token`, you'll be prompted to re-authenticate **once** — afterward, all future expirations are handled silently.
+
+---
+
 ## 0.4.2 — 2026-04-30
 
 ### Added

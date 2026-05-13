@@ -1,4 +1,4 @@
-import { OAuth2Client } from "google-auth-library";
+import { OAuth2Client, Credentials } from "google-auth-library";
 import * as fs from "fs";
 import * as path from "path";
 import * as http from "http";
@@ -55,6 +55,38 @@ function saveToken(token: any, profile: AuthProfile): void {
     fs.mkdirSync(TOKEN_DIR, { recursive: true });
   }
   fs.writeFileSync(tokenPath(profile), JSON.stringify(token, null, 2));
+}
+
+/**
+ * refresh 응답에는 보통 refresh_token이 포함되지 않으므로,
+ * 기존 토큰의 refresh_token/scope를 보존하며 새 credentials를 머지한다.
+ */
+function mergeCredentials(prev: any, next: Credentials): any {
+  return {
+    ...prev,
+    ...next,
+    refresh_token: next.refresh_token || prev?.refresh_token,
+    scope: next.scope || prev?.scope,
+  };
+}
+
+/**
+ * google-auth-library가 access token을 자동 갱신할 때마다
+ * 디스크에 최신 credentials를 영속화한다. 장수 세션에서 필수.
+ */
+function attachAutoRefresh(
+  oauth2Client: OAuth2Client,
+  profile: AuthProfile
+): void {
+  oauth2Client.on("tokens", (tokens) => {
+    const current = loadSavedToken(profile) || {};
+    const merged = mergeCredentials(current, tokens);
+    try {
+      saveToken(merged, profile);
+    } catch (err) {
+      console.error(`[auth:${profile}] failed to persist refreshed token`, err);
+    }
+  });
 }
 
 function tokenHasScope(token: any, scope: string): boolean {
@@ -121,8 +153,10 @@ async function authorizeViaLocalServer(
         }
 
         const { tokens } = await oauth2Client.getToken(code);
-        oauth2Client.setCredentials(tokens);
-        saveToken(tokens, profile);
+        const prev = loadSavedToken(profile);
+        const merged = mergeCredentials(prev, tokens);
+        oauth2Client.setCredentials(merged);
+        saveToken(merged, profile);
 
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
         res.end(
@@ -170,6 +204,9 @@ export async function getAuthenticatedClient(
     "http://localhost:3000"
   );
 
+  // 자동 갱신 토큰 영속화는 신규/기존 인증 모두에 필요하므로 최상단에서 한 번만 부착.
+  attachAutoRefresh(oauth2Client, profile);
+
   const savedToken = loadSavedToken(profile);
   if (savedToken) {
     // 활성화한 모듈의 스코프가 기존 토큰에 빠져있으면 재인증.
@@ -179,16 +216,14 @@ export async function getAuthenticatedClient(
       return oauth2Client;
     }
 
+    // refresh_token만 있어도 라이브러리가 호출 시점에 알아서 access_token을 갱신한다.
+    // expiry_date가 없거나 만료되어도 setCredentials 후 다음 API 호출이 자동 refresh를 유발.
     oauth2Client.setCredentials(savedToken);
 
-    if (savedToken.expiry_date && savedToken.expiry_date < Date.now()) {
-      try {
-        const { credentials } = await oauth2Client.refreshAccessToken();
-        oauth2Client.setCredentials(credentials);
-        saveToken(credentials, profile);
-      } catch {
-        await authorizeViaLocalServer(oauth2Client, scopes, profile);
-      }
+    // refresh_token 자체가 폐기/회수된 경우만 재인증 강제.
+    // 일반 만료는 라이브러리에 맡긴다 (자동 refresh + tokens 이벤트로 디스크 동기화).
+    if (!savedToken.refresh_token) {
+      await authorizeViaLocalServer(oauth2Client, scopes, profile);
     }
 
     return oauth2Client;
@@ -196,6 +231,28 @@ export async function getAuthenticatedClient(
 
   await authorizeViaLocalServer(oauth2Client, scopes, profile);
   return oauth2Client;
+}
+
+/**
+ * API 호출 중 401/invalid_grant 등 인증 에러를 만났을 때 호출하면,
+ * 토큰을 강제로 한 번 refresh 시도한다. 실패 시 false 반환.
+ * 호출부에서 false면 사용자에게 재인증 안내를 노출하는 게 좋다.
+ */
+export async function forceRefresh(
+  oauth2Client: OAuth2Client,
+  profile: AuthProfile = "default"
+): Promise<boolean> {
+  try {
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    const prev = loadSavedToken(profile);
+    const merged = mergeCredentials(prev, credentials);
+    oauth2Client.setCredentials(merged);
+    saveToken(merged, profile);
+    return true;
+  } catch (err) {
+    console.error(`[auth:${profile}] forceRefresh failed`, err);
+    return false;
+  }
 }
 
 export function getRefreshToken(): string {
